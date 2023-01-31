@@ -1,9 +1,12 @@
-import { serve } from "https://deno.land/std@0.173.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.175.0/http/server.ts";
 import {
   ImageMagick,
   initializeImageMagick,
   MagickGeometry,
-} from "https://deno.land/x/imagemagick_deno/mod.ts";
+} from "https://deno.land/x/imagemagick_deno@0.0.14/mod.ts";
+import { parseMediaType } from "https://deno.land/std@0.175.0/media_types/parse_media_type.ts";
+
+const ACCEPTED_MODES = ["resize", "crop"];
 
 await initializeImageMagick();
 serve(
@@ -17,17 +20,28 @@ serve(
         status: 400,
       });
     }
-    const sourceReq = await fetch(reqURL.searchParams.get("image") as string);
-    const imageType = (<string> sourceReq.headers.get("Content-Type")).split(
-      "/",
-    )[1];
-    const imageBuffer = new Uint8Array(await sourceReq.arrayBuffer());
+    const sourceRes = await fetch(reqURL.searchParams.get("image") as string);
+    if (!sourceRes.ok) {
+      return new Response("Error retrieving image from URL", { status: 400 });
+    }
+
+    const mediaType =
+      parseMediaType(<string> sourceRes.headers.get("Content-Type"))[0];
+    if (mediaType.split("/")[0] !== "image") {
+      return new Response("URL is not image type", { status: 400 });
+    }
+
+    const imageBuffer = new Uint8Array(await sourceRes.arrayBuffer());
     const mode = reqURL.searchParams.get("mode") || "resize";
+    if (!ACCEPTED_MODES.includes(mode)) {
+      return new Response("Mode not accepted: please use 'resize' or 'crop'.", {
+        status: 400,
+      });
+    }
     const sizingData = new MagickGeometry(
       Number(reqURL.searchParams.get("width")) || 0,
       Number(reqURL.searchParams.get("height")) || 0,
     );
-    sizingData.height = Number(reqURL.searchParams.get("height")) || 0;
     if (reqURL.searchParams.get("height") && reqURL.searchParams.get("width")) {
       sizingData.ignoreAspectRatio = true;
     }
@@ -37,10 +51,6 @@ serve(
           image.resize(sizingData);
         } else if (mode === "crop") {
           image.crop(sizingData);
-        } else {
-          return new Response("Invalid mode", {
-            status: 400,
-          });
         }
         image.write(function (data) {
           resolve(data);
@@ -49,7 +59,7 @@ serve(
     });
     return new Response(await imageResult, {
       headers: {
-        "Content-Type": `image/${imageType}`,
+        "Content-Type": mediaType,
       },
     });
   },
