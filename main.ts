@@ -57,11 +57,18 @@ serve(
         });
       });
     });
-    return new Response(await imageResult, {
-      headers: {
-        "Content-Type": mediaType,
-      },
-    });
+    const imgArray = await imageResult;
+    if (imgArray.length / 1_048_576 <= 10) {
+      return new Response(imgArray, {
+        headers: {
+          "Content-Type": mediaType,
+        },
+      });
+    } else {
+      return new Response("Size of generated image exceeds 10mb", {
+        status: 500,
+      });
+    }
   },
   { port: 8080 },
 );
