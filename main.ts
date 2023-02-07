@@ -44,8 +44,7 @@ async function getRemoteImage(image: string) {
   if (!sourceRes.ok) {
     return "Error retrieving image from URL.";
   }
-  const mediaType =
-    parseMediaType(<string> sourceRes.headers.get("Content-Type"))[0];
+  const mediaType = parseMediaType(sourceRes.headers.get("Content-Type")!)[0];
   if (mediaType.split("/")[0] !== "image") {
     return "URL is not image type.";
   }
@@ -55,27 +54,25 @@ async function getRemoteImage(image: string) {
   };
 }
 
-async function modifyImage(imageBuffer, params) {
+function modifyImage(
+  imageBuffer: Uint8Array,
+  params: { width: number; height: number; mode: string },
+) {
   const sizingData = new MagickGeometry(
     params.width,
     params.height,
   );
-  if (params.height && params.width) {
-    sizingData.ignoreAspectRatio = true;
-  }
-  const imageResult: Promise<Uint8Array> = new Promise((resolve) => {
-    ImageMagick.read(imageBuffer, function (image) {
+  sizingData.ignoreAspectRatio = params.height > 0 && params.width > 0;
+  return new Promise<Uint8Array>((resolve) => {
+    ImageMagick.read(imageBuffer, (image) => {
       if (params.mode === "resize") {
         image.resize(sizingData);
-      } else if (params.mode === "crop") {
+      } else {
         image.crop(sizingData);
       }
-      image.write(function (data) {
-        resolve(data);
-      });
+      image.write((data) => resolve(data));
     });
   });
-  return imageResult;
 }
 
 serve(
