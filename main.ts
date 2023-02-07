@@ -6,6 +6,8 @@ import {
 } from "https://deno.land/x/imagemagick_deno@0.0.14/mod.ts";
 import { parseMediaType } from "https://deno.land/std@0.175.0/media_types/parse_media_type.ts";
 
+await initializeImageMagick();
+
 function parseParams(reqUrl: URL) {
   const image = reqUrl.searchParams.get("image");
   if (image == null) {
@@ -40,7 +42,6 @@ function parseParams(reqUrl: URL) {
   };
 }
 
-await initializeImageMagick();
 serve(
   async (req: Request) => {
     const reqURL = new URL(req.url);
