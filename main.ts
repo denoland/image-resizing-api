@@ -21,7 +21,6 @@ function parseParams(reqUrl: URL) {
   if (height < 0 || width < 0) {
     return "Negative height or width is not supported.";
   }
-  // prevent someone providing too large of a dimension
   const maxDimension = 2048;
   if (height > maxDimension || width > maxDimension) {
     return `Width and height cannot exceed ${maxDimension}.`;
