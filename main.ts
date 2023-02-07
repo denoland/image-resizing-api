@@ -21,25 +21,61 @@ function parseParams(reqUrl: URL) {
   if (height < 0 || width < 0) {
     return "Negative height or width is not supported.";
   }
-
   // prevent someone providing too large of a dimension
   const maxDimension = 2048;
   if (height > maxDimension || width > maxDimension) {
     return `Width and height cannot exceed ${maxDimension}.`;
   }
-
   const acceptedModes = ["resize", "crop"];
   const mode = reqUrl.searchParams.get("mode") || "resize";
   if (!acceptedModes.includes(mode)) {
     return "Mode not accepted: please use 'resize' or 'crop'.";
   }
-
   return {
     image,
     height,
     width,
     mode,
   };
+}
+
+async function getRemoteImage(image: string) {
+  const sourceRes = await fetch(image);
+  if (!sourceRes.ok) {
+    return "Error retrieving image from URL.";
+  }
+  const mediaType =
+    parseMediaType(<string> sourceRes.headers.get("Content-Type"))[0];
+  if (mediaType.split("/")[0] !== "image") {
+    return "URL is not image type.";
+  }
+  return {
+    buffer: new Uint8Array(await sourceRes.arrayBuffer()),
+    mediaType,
+  };
+}
+
+async function modifyImage(imageBuffer, params) {
+  const sizingData = new MagickGeometry(
+    params.width,
+    params.height,
+  );
+  if (params.height && params.width) {
+    sizingData.ignoreAspectRatio = true;
+  }
+  const imageResult: Promise<Uint8Array> = new Promise((resolve) => {
+    ImageMagick.read(imageBuffer, function (image) {
+      if (params.mode === "resize") {
+        image.resize(sizingData);
+      } else if (params.mode === "crop") {
+        image.crop(sizingData);
+      }
+      image.write(function (data) {
+        resolve(data);
+      });
+    });
+  });
+  return imageResult;
 }
 
 serve(
@@ -49,38 +85,14 @@ serve(
     if (typeof params === "string") {
       return new Response(params, { status: 400 });
     }
-    const sourceRes = await fetch(params.image);
-    if (!sourceRes.ok) {
-      return new Response("Error retrieving image from URL", { status: 400 });
+    const remoteImage = await getRemoteImage(params.image);
+    if (remoteImage === "string") {
+      return new Response(remoteImage, { status: 400 });
     }
-    const mediaType =
-      parseMediaType(<string> sourceRes.headers.get("Content-Type"))[0];
-    if (mediaType.split("/")[0] !== "image") {
-      return new Response("URL is not image type", { status: 400 });
-    }
-    const sizingData = new MagickGeometry(
-      Number(params.width),
-      Number(params.height),
-    );
-    if (params.height && params.width) {
-      sizingData.ignoreAspectRatio = true;
-    }
-    const imageBuffer = new Uint8Array(await sourceRes.arrayBuffer());
-    const imageResult: Promise<Uint8Array> = new Promise((resolve) => {
-      ImageMagick.read(imageBuffer, function (image) {
-        if (params.mode === "resize") {
-          image.resize(sizingData);
-        } else if (params.mode === "crop") {
-          image.crop(sizingData);
-        }
-        image.write(function (data) {
-          resolve(data);
-        });
-      });
-    });
-    return new Response(await imageResult, {
+    const modifiedImage = await modifyImage(remoteImage.buffer, params);
+    return new Response(modifiedImage, {
       headers: {
-        "Content-Type": mediaType,
+        "Content-Type": remoteImage.mediaType,
       },
     });
   },
