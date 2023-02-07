@@ -32,6 +32,12 @@ serve(
     }
 
     const imageBuffer = new Uint8Array(await sourceRes.arrayBuffer());
+    if (imageBuffer.length / 1_048_576 > 10) {
+      return new Response("Image size exceeds max content of 10mb.", {
+        status: 400,
+      });
+    }
+
     const mode = reqURL.searchParams.get("mode") || "resize";
     if (!ACCEPTED_MODES.includes(mode)) {
       return new Response("Mode not accepted: please use 'resize' or 'crop'.", {
@@ -57,18 +63,11 @@ serve(
         });
       });
     });
-    const imgArray = await imageResult;
-    if (imgArray.length / 1_048_576 <= 10) {
-      return new Response(imgArray, {
-        headers: {
-          "Content-Type": mediaType,
-        },
-      });
-    } else {
-      return new Response("Size of generated image exceeds 10mb", {
-        status: 500,
-      });
-    }
+    return new Response(await imageResult, {
+      headers: {
+        "Content-Type": mediaType,
+      },
+    });
   },
   { port: 8080 },
 );
