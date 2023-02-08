@@ -25,9 +25,8 @@ function parseParams(reqUrl: URL) {
   if (height > maxDimension || width > maxDimension) {
     return `Width and height cannot exceed ${maxDimension}.`;
   }
-  const acceptedModes = ["resize", "crop"];
   const mode = reqUrl.searchParams.get("mode") || "resize";
-  if (!acceptedModes.includes(mode)) {
+  if (mode !== "resize" && mode !== "crop") {
     return "Mode not accepted: please use 'resize' or 'crop'.";
   }
   return {
@@ -55,7 +54,7 @@ async function getRemoteImage(image: string) {
 
 function modifyImage(
   imageBuffer: Uint8Array,
-  params: { width: number; height: number; mode: string },
+  params: { width: number; height: number; mode: "resize" | "crop" },
 ) {
   const sizingData = new MagickGeometry(
     params.width,
