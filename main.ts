@@ -81,7 +81,7 @@ serve(
       return new Response(params, { status: 400 });
     }
     const remoteImage = await getRemoteImage(params.image);
-    if (remoteImage === "string") {
+    if (typeof remoteImage === "string") {
       return new Response(remoteImage, { status: 400 });
     }
     const modifiedImage = await modifyImage(remoteImage.buffer, params);
